@@ -2,20 +2,19 @@ import sys
 
 import pygame
 
-# --- Initialization ---
 pygame.init()
 
-# --- Display Settings ---
+
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("NO WAY OUT?")
 
-# --- Game Clock ---
+
 clock = pygame.time.Clock()
 FPS = 60
 
-# --- Colors ---
+
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
