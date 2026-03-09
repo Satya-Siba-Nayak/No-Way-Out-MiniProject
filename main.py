@@ -27,22 +27,18 @@ def main():
     while running:
         # 1. Event Handling (Input)
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:  # When the user clicks the window's 'X'
+            if event.type == pygame.QUIT:
                 running = False
 
         # 2. Game Logic (Updates)
-        # We will add the movement engine and Keya's puzzle logic here!
 
         # 3. Drawing (Rendering)
-        screen.fill(BLACK)  # Clear the screen with a black background
+        screen.fill(BLACK)
 
-        # Update the full display Surface to the screen
         pygame.display.flip()
 
-        # Cap the frame rate
         clock.tick(FPS)
 
-    # --- Clean Exit ---
     pygame.quit()
     sys.exit()
 
