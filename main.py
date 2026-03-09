@@ -4,6 +4,7 @@ from PIL import Image
 
 # Initialize Pygame
 pygame.init()
+pygame.mixer.init()
 
 def get_gif_dimensions(path):
     """Returns the width and height of the GIF."""
@@ -12,6 +13,7 @@ def get_gif_dimensions(path):
 
 # Configuration
 GIF_PATH = "parallax-mountain-animX1.gif"
+MUSIC_PATH = "Sunstone_Meadow.mp3"
 ORIG_WIDTH, ORIG_HEIGHT = get_gif_dimensions(GIF_PATH)
 
 # Scale factor (3x makes it 816x480)
@@ -30,6 +32,7 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GRAY = (200, 200, 200)
 GOLD = (255, 215, 0)
+RED = (255, 100, 100)
 
 # Fonts
 FONT = pygame.font.SysFont("Arial", 28)
@@ -53,7 +56,16 @@ def load_gif_frames(path, target_size):
     return frames
 
 def main():
-    # Load GIF frames
+    # 1. Load Music
+    try:
+        pygame.mixer.music.load(MUSIC_PATH)
+        pygame.mixer.music.play(-1) # Loop indefinitely
+        is_muted = False
+    except Exception as e:
+        print(f"Error loading music: {e}")
+        is_muted = True
+
+    # 2. Load GIF frames
     gif_frames = load_gif_frames(GIF_PATH, (WINDOW_WIDTH, WINDOW_HEIGHT))
     current_frame = 0
     frame_delay = 5
@@ -67,20 +79,29 @@ def main():
     # Player Data
     player_name = ""
     
-    running = True
+    # Mute Button Rect
+    mute_button_rect = pygame.Rect(WINDOW_WIDTH - 50, 10, 40, 40)
 
+    running = True
     while running:
         # 1. Event Handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if mute_button_rect.collidepoint(event.pos):
+                    is_muted = not is_muted
+                    if is_muted:
+                        pygame.mixer.music.pause()
+                    else:
+                        pygame.mixer.music.unpause()
+
             if current_state == STATE_LOGIN:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
-                        if player_name.strip(): # Only proceed if name is not empty
+                        if player_name.strip():
                             current_state = STATE_GAME
-                            print(f"Starting game for: {player_name}")
                     elif event.key == pygame.K_BACKSPACE:
                         player_name = player_name[:-1]
                     else:
@@ -94,19 +115,33 @@ def main():
             frame_counter = 0
 
         # 3. Drawing (Rendering)
-        # Background is shared across states
         if gif_frames:
             screen.blit(gif_frames[current_frame], (0, 0))
         else:
             screen.fill(BLACK)
 
-        # Semi-transparent overlay for readability
         overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 120)) 
         screen.blit(overlay, (0, 0))
 
+        # --- Mute Icon (Drawn in the corner) ---
+        pygame.draw.rect(screen, GRAY if is_muted else WHITE, mute_button_rect, 2)
+        # Simple procedural icon: Speaker shape
+        icon_color = RED if is_muted else WHITE
+        pygame.draw.polygon(screen, icon_color, [
+            (mute_button_rect.x + 10, mute_button_rect.y + 15),
+            (mute_button_rect.x + 18, mute_button_rect.y + 15),
+            (mute_button_rect.x + 25, mute_button_rect.y + 10),
+            (mute_button_rect.x + 25, mute_button_rect.y + 30),
+            (mute_button_rect.x + 18, mute_button_rect.y + 25),
+            (mute_button_rect.x + 10, mute_button_rect.y + 25)
+        ])
+        if is_muted:
+            # Draw an 'X' over it
+            pygame.draw.line(screen, RED, (mute_button_rect.x + 10, mute_button_rect.y + 10), (mute_button_rect.x + 30, mute_button_rect.y + 30), 3)
+            pygame.draw.line(screen, RED, (mute_button_rect.x + 30, mute_button_rect.y + 10), (mute_button_rect.x + 10, mute_button_rect.y + 30), 3)
+
         if current_state == STATE_LOGIN:
-            # --- LOGIN SCREEN UI ---
             title_surf = TITLE_FONT.render("NO WAY OUT?", True, WHITE)
             title_rect = title_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.2))
             screen.blit(title_surf, title_rect)
@@ -128,7 +163,6 @@ def main():
             screen.blit(footer_surf, footer_rect)
 
         elif current_state == STATE_GAME:
-            # --- WORK IN PROGRESS SCREEN ---
             welcome_surf = TITLE_FONT.render(f"Welcome, {player_name}!", True, GOLD)
             welcome_rect = welcome_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.3))
             screen.blit(welcome_surf, welcome_rect)
@@ -136,10 +170,6 @@ def main():
             msg_surf = FONT.render("GAME IN PROGRESS", True, WHITE)
             msg_rect = msg_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.5))
             screen.blit(msg_surf, msg_rect)
-
-            sub_msg_surf = SMALL_FONT.render("Building the escape room... Check back soon!", True, GRAY)
-            sub_msg_rect = sub_msg_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.6))
-            screen.blit(sub_msg_surf, sub_msg_rect)
 
         pygame.display.flip()
         clock.tick(FPS)
