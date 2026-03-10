@@ -1,4 +1,5 @@
 import sys
+
 import pygame
 from PIL import Image
 
@@ -6,10 +7,12 @@ from PIL import Image
 pygame.init()
 pygame.mixer.init()
 
+
 def get_gif_dimensions(path):
     """Returns the width and height of the GIF."""
     with Image.open(path) as img:
         return img.size
+
 
 # Configuration
 GIF_PATH = "parallax-mountain-animX1.gif"
@@ -39,6 +42,7 @@ FONT = pygame.font.SysFont("Arial", 28)
 TITLE_FONT = pygame.font.SysFont("Arial", 42, bold=True)
 SMALL_FONT = pygame.font.SysFont("Arial", 18)
 
+
 def load_gif_frames(path, target_size):
     """Loads a GIF and returns a list of scaled pygame surfaces."""
     gif = Image.open(path)
@@ -55,11 +59,12 @@ def load_gif_frames(path, target_size):
         pass
     return frames
 
+
 def main():
     # 1. Load Music
     try:
         pygame.mixer.music.load(MUSIC_PATH)
-        pygame.mixer.music.play(-1) # Loop indefinitely
+        pygame.mixer.music.play(-1)  # Loop indefinitely
         is_muted = False
     except Exception as e:
         print(f"Error loading music: {e}")
@@ -78,7 +83,7 @@ def main():
 
     # Player Data
     player_name = ""
-    
+
     # Mute Button Rect
     mute_button_rect = pygame.Rect(WINDOW_WIDTH - 50, 10, 40, 40)
 
@@ -88,7 +93,7 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if mute_button_rect.collidepoint(event.pos):
                     is_muted = not is_muted
@@ -121,54 +126,82 @@ def main():
             screen.fill(BLACK)
 
         overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 120)) 
+        overlay.fill((0, 0, 0, 120))
         screen.blit(overlay, (0, 0))
 
         # --- Mute Icon (Drawn in the corner) ---
         pygame.draw.rect(screen, GRAY if is_muted else WHITE, mute_button_rect, 2)
         # Simple procedural icon: Speaker shape
         icon_color = RED if is_muted else WHITE
-        pygame.draw.polygon(screen, icon_color, [
-            (mute_button_rect.x + 10, mute_button_rect.y + 15),
-            (mute_button_rect.x + 18, mute_button_rect.y + 15),
-            (mute_button_rect.x + 25, mute_button_rect.y + 10),
-            (mute_button_rect.x + 25, mute_button_rect.y + 30),
-            (mute_button_rect.x + 18, mute_button_rect.y + 25),
-            (mute_button_rect.x + 10, mute_button_rect.y + 25)
-        ])
+        pygame.draw.polygon(
+            screen,
+            icon_color,
+            [
+                (mute_button_rect.x + 10, mute_button_rect.y + 15),
+                (mute_button_rect.x + 18, mute_button_rect.y + 15),
+                (mute_button_rect.x + 25, mute_button_rect.y + 10),
+                (mute_button_rect.x + 25, mute_button_rect.y + 30),
+                (mute_button_rect.x + 18, mute_button_rect.y + 25),
+                (mute_button_rect.x + 10, mute_button_rect.y + 25),
+            ],
+        )
         if is_muted:
             # Draw an 'X' over it
-            pygame.draw.line(screen, RED, (mute_button_rect.x + 10, mute_button_rect.y + 10), (mute_button_rect.x + 30, mute_button_rect.y + 30), 3)
-            pygame.draw.line(screen, RED, (mute_button_rect.x + 30, mute_button_rect.y + 10), (mute_button_rect.x + 10, mute_button_rect.y + 30), 3)
+            pygame.draw.line(
+                screen,
+                RED,
+                (mute_button_rect.x + 10, mute_button_rect.y + 10),
+                (mute_button_rect.x + 30, mute_button_rect.y + 30),
+                3,
+            )
+            pygame.draw.line(
+                screen,
+                RED,
+                (mute_button_rect.x + 30, mute_button_rect.y + 10),
+                (mute_button_rect.x + 10, mute_button_rect.y + 30),
+                3,
+            )
 
         if current_state == STATE_LOGIN:
             title_surf = TITLE_FONT.render("NO WAY OUT?", True, WHITE)
-            title_rect = title_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.2))
+            title_rect = title_surf.get_rect(
+                center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.2)
+            )
             screen.blit(title_surf, title_rect)
 
             prompt_surf = FONT.render("Enter Player Name:", True, WHITE)
-            prompt_rect = prompt_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.45))
+            prompt_rect = prompt_surf.get_rect(
+                center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.45)
+            )
             screen.blit(prompt_surf, prompt_rect)
 
-            input_box_rect = pygame.Rect(WINDOW_WIDTH // 2 - 150, WINDOW_HEIGHT * 0.52, 300, 45)
+            input_box_rect = pygame.Rect(
+                WINDOW_WIDTH // 2 - 150, WINDOW_HEIGHT * 0.52, 300, 45
+            )
             pygame.draw.rect(screen, WHITE, input_box_rect, 2)
-            
+
             cursor = "|" if (pygame.time.get_ticks() // 500) % 2 == 0 else ""
             name_surf = FONT.render(player_name + cursor, True, WHITE)
             name_rect = name_surf.get_rect(center=input_box_rect.center)
             screen.blit(name_surf, name_rect)
 
             footer_surf = SMALL_FONT.render("Press ENTER to start", True, GRAY)
-            footer_rect = footer_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.85))
+            footer_rect = footer_surf.get_rect(
+                center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.85)
+            )
             screen.blit(footer_surf, footer_rect)
 
         elif current_state == STATE_GAME:
             welcome_surf = TITLE_FONT.render(f"Welcome, {player_name}!", True, GOLD)
-            welcome_rect = welcome_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.3))
+            welcome_rect = welcome_surf.get_rect(
+                center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.3)
+            )
             screen.blit(welcome_surf, welcome_rect)
 
             msg_surf = FONT.render("GAME IN PROGRESS", True, WHITE)
-            msg_rect = msg_surf.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.5))
+            msg_rect = msg_surf.get_rect(
+                center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT * 0.5)
+            )
             screen.blit(msg_surf, msg_rect)
 
         pygame.display.flip()
@@ -176,6 +209,7 @@ def main():
 
     pygame.quit()
     sys.exit()
+
 
 if __name__ == "__main__":
     main()
