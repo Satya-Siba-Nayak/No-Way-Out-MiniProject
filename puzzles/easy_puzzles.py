@@ -59,21 +59,21 @@ class BinaryLockPuzzle:
             return False
 
 
-class BedSlicingPuzzle:
+class CouchSlicingPuzzle:
     """Puzzle 3 — extract a substring from a coded string."""
 
-    PUZZLE_ID = "bed_slicing"
-    TITLE = "THE UNMADE BED"
+    PUZZLE_ID = "couch_slicing"
+    TITLE = "THE OLD COUCH"
 
     def __init__(self):
         self.clue = "ZZZGOLDZZZ"
         self.solution = self.clue[3:7]   # "GOLD"
 
         self.description = [
-            "Under the dusty pillow, you find a carved sequence:",
+            "Tucked between the couch cushions, you find a coded card:",
             f'  [{self.clue}]',
             "",
-            "A scrap of paper caught in the bedframe says:",
+            "A scrap of paper wedged in the armrest says:",
             "'Discard the 3 sleepers at the start,",
             " and the 3 sleepers at the end.'",
             "",
@@ -88,5 +88,7 @@ class BedSlicingPuzzle:
 PUZZLE_REGISTRY = {
     "caesar_cipher": CaesarCipherPuzzle,
     "binary_lock": BinaryLockPuzzle,
-    "bed_slicing": BedSlicingPuzzle,
+    "couch_slicing": CouchSlicingPuzzle,
+    # Keep backward compatibility with old save files
+    "bed_slicing": CouchSlicingPuzzle,
 }

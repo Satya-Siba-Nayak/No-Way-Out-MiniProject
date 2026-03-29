@@ -2,13 +2,14 @@
 Room State — the main gameplay screen.
 
 Player walks around the room, interacts with objects, and triggers puzzles.
+Supports both the legacy code-built room and the TMX-rendered map.
 """
 
 import sys
 import pygame
 from states.base_state import State
 from engine.player import Player
-from engine.room import build_easy_room, TILE
+from engine.room import build_easy_room_from_tmx, TILE
 from engine.save_system import save_game
 
 
@@ -19,11 +20,15 @@ class RoomState(State):
         super().__init__(machine, ctx)
         self.room = None
         self.player = None
-        self.bookshelf_rect = None
         self.nearby_obj = None          # interactable the player is near
         self.puzzles_solved = set()
         self.show_prompt = False
         self.door_unlocked = False
+
+        # TMX scaling
+        self.scale = 1.0
+        self.offset_x = 0
+        self.offset_y = 0
 
         # Win state
         self.won = False
@@ -44,14 +49,34 @@ class RoomState(State):
         self.hud_height = 50
 
     def enter(self):
-        # Build the room
-        self.room, start_pos, self.bookshelf_rect = build_easy_room()
+        screen_w = self.ctx["screen_w"]
+        screen_h = self.ctx["screen_h"]
+
+        # Build the room from the TMX map
+        result = build_easy_room_from_tmx()
+        self.room, start_pos = result[0], result[1]
+
+        # Calculate scaling to fit the room in the window
+        # The playable area is screen minus the HUD bar
+        play_h = screen_h - self.hud_height
+        scale_x = screen_w / self.room.pixel_w
+        scale_y = play_h / self.room.pixel_h
+        self.scale = min(scale_x, scale_y)
+
+        # Center the scaled map in the available area
+        scaled_w = int(self.room.pixel_w * self.scale)
+        scaled_h = int(self.room.pixel_h * self.scale)
+        self.offset_x = (screen_w - scaled_w) // 2
+        self.offset_y = (play_h - scaled_h) // 2
+
+        # Get the chosen sprite
+        sprite_id = self.ctx.get("sprite_id", "finn")
 
         # Load save if continuing
         if self.ctx.get("load_save") and self.ctx.get("save_data"):
             sd = self.ctx["save_data"]
             pos = sd.get("player_position", list(start_pos))
-            self.player = Player(pos[0], pos[1])
+            self.player = Player(pos[0], pos[1], sprite_id=sprite_id)
             self.puzzles_solved = set(sd.get("puzzles_solved", []))
             # Mark interactables as solved
             for obj in self.room.interactables:
@@ -59,7 +84,7 @@ class RoomState(State):
                     obj.solved = True
             self._check_door()
         else:
-            self.player = Player(start_pos[0], start_pos[1])
+            self.player = Player(start_pos[0], start_pos[1], sprite_id=sprite_id)
 
     def _check_door(self):
         """Update door label if all puzzles solved."""
@@ -76,6 +101,7 @@ class RoomState(State):
             current_room="easy_room",
             puzzles_solved=list(self.puzzles_solved),
             player_pos=(self.player.rect.x, self.player.rect.y),
+            sprite_id=self.ctx.get("sprite_id", "finn"),
         )
 
     # --- Events -------------------------------------------------------------
@@ -150,28 +176,27 @@ class RoomState(State):
         w = self.ctx["screen_w"]
         h = self.ctx["screen_h"]
 
-        # Offset to center the room
-        ox = (w - self.room.pixel_w) // 2
+        surface.fill(self.BLACK)
 
-        # Create a room surface
-        room_surf = pygame.Surface((self.room.pixel_w, self.room.pixel_h))
+        # Create a room surface at native resolution
+        room_surf = pygame.Surface(
+            (self.room.pixel_w, self.room.pixel_h), pygame.SRCALPHA
+        )
         self.room.draw(room_surf, self.font)
 
-        # Draw bookshelf decoration
-        if self.bookshelf_rect:
-            pygame.draw.rect(room_surf, (100, 70, 50), self.bookshelf_rect)
-            pygame.draw.rect(room_surf, (60, 40, 30), self.bookshelf_rect, 2)
-            lbl = self.small_font.render("Bookshelf", True, self.WHITE)
-            room_surf.blit(lbl, lbl.get_rect(
-                midbottom=(self.bookshelf_rect.centerx,
-                           self.bookshelf_rect.top - 2)))
-
-        # Draw player
+        # Draw player on the room surface (native coords)
         self.player.draw(room_surf)
 
-        # Blit room to screen
-        surface.fill(self.BLACK)
-        surface.blit(room_surf, (ox, 0))
+        # Scale the room surface to fit the window
+        scaled_w = int(self.room.pixel_w * self.scale)
+        scaled_h = int(self.room.pixel_h * self.scale)
+        if self.scale != 1.0:
+            scaled_surf = pygame.transform.smoothscale(room_surf,
+                                                        (scaled_w, scaled_h))
+        else:
+            scaled_surf = room_surf
+
+        surface.blit(scaled_surf, (self.offset_x, self.offset_y))
 
         # --- HUD bar at bottom ---
         hud_rect = pygame.Rect(0, h - self.hud_height, w, self.hud_height)

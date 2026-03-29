@@ -1,18 +1,25 @@
 """
 Room — defines the tile-based room layout, walls, and interactable objects.
 
-This is a placeholder room built with code. When Keya finishes the .tmx file
-in Tiled, we can replace `build_easy_room()` with a TMX loader.
+Supports both the legacy code-built room and TMX-loaded rooms.
 """
 
+import os
 import pygame
+from engine.tmx_loader import load_tmx
 
-# Tile size in pixels
+# Tile size in pixels (map grid size)
 TILE = 32
+
+# Path to the TMX map for the Easy level
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+EASY_TMX_PATH = os.path.join(
+    _BASE_DIR, "Maps", "Level 1", "Tiled images", "EasyLevel1.tmx"
+)
 
 
 class Interactable:
-    """An object the player can interact with (desk, panel, bed, door)."""
+    """An object the player can interact with (desk, panel, couch, door)."""
 
     def __init__(self, rect, label, puzzle_id=None, color=(180, 140, 80)):
         self.rect = rect
@@ -21,11 +28,12 @@ class Interactable:
         self.color = color
         self.solved = False
 
-    def draw(self, surface, font):
-        """Draw the object as a colored block with a label."""
-        c = (80, 180, 80) if self.solved else self.color
-        pygame.draw.rect(surface, c, self.rect)
-        pygame.draw.rect(surface, (0, 0, 0), self.rect, 2)
+    def draw(self, surface, font, show_colored_block=True):
+        """Draw the object as a colored block with a label (legacy mode)."""
+        if show_colored_block:
+            c = (80, 180, 80) if self.solved else self.color
+            pygame.draw.rect(surface, c, self.rect)
+            pygame.draw.rect(surface, (0, 0, 0), self.rect, 2)
 
         # Label above the object
         lbl = font.render(self.label, True, (255, 255, 255))
@@ -46,6 +54,9 @@ class Room:
         self.floor_color = (60, 55, 50)
         self.wall_color = (90, 80, 70)
 
+        # TMX rendering
+        self.tmx_surface = None       # pre-rendered map (or None for legacy)
+
     # --- Layout builders (called once) --------------------------------------
 
     def build_walls_border(self):
@@ -63,21 +74,23 @@ class Room:
 
     def draw(self, surface, font):
         """Draw floor, walls, and interactables."""
-        # Floor
-        surface.fill(self.floor_color)
-
-        # Walls
-        for wall in self.walls:
-            pygame.draw.rect(surface, self.wall_color, wall)
-            # Brick pattern
-            for bx in range(wall.left, wall.right, TILE):
-                for by in range(wall.top, wall.bottom, TILE):
-                    pygame.draw.rect(surface, (70, 65, 55),
-                                     (bx, by, TILE, TILE), 1)
-
-        # Interactable objects
-        for obj in self.interactables:
-            obj.draw(surface, font)
+        if self.tmx_surface is not None:
+            # TMX mode — blit the pre-rendered tile map
+            surface.blit(self.tmx_surface, (0, 0))
+            # Don't draw colored blocks over the tile art
+            for obj in self.interactables:
+                obj.draw(surface, font, show_colored_block=False)
+        else:
+            # Legacy mode — colored rectangles
+            surface.fill(self.floor_color)
+            for wall in self.walls:
+                pygame.draw.rect(surface, self.wall_color, wall)
+                for bx in range(wall.left, wall.right, TILE):
+                    for by in range(wall.top, wall.bottom, TILE):
+                        pygame.draw.rect(surface, (70, 65, 55),
+                                         (bx, by, TILE, TILE), 1)
+            for obj in self.interactables:
+                obj.draw(surface, font, show_colored_block=True)
 
     # --- Query helpers ------------------------------------------------------
 
@@ -96,9 +109,14 @@ class Room:
         )
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Room Builders
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
 def build_easy_room():
     """
-    Build the Easy-level escape room.
+    Build the Easy-level escape room (legacy / fallback version).
     Layout (25×15 tiles = 800×480 pixels — fits in our 816×480 window):
 
         ┌──────────────────────────┐
@@ -107,7 +125,7 @@ def build_easy_room():
         │                          │
         │        (player start)    │
         │                          │
-        │  [Bed]           [Door]  │
+        │  [Couch]         [Door]  │
         └──────────────────────────┘
     """
     room = Room(25, 15)
@@ -134,11 +152,11 @@ def build_easy_room():
         color=(60, 60, 90),        # dark metal
     )
 
-    # Bed (bottom-left area) — triggers String Slicing puzzle
-    bed = Interactable(
+    # Couch (bottom-left area) — triggers String Slicing puzzle
+    couch = Interactable(
         rect=pygame.Rect(ox + TILE * 2, TILE * 11, TILE * 3, TILE * 2),
-        label="Bed",
-        puzzle_id="bed_slicing",
+        label="Couch",
+        puzzle_id="couch_slicing",
         color=(120, 80, 80),       # reddish-brown
     )
 
@@ -150,14 +168,13 @@ def build_easy_room():
         color=(100, 60, 40),       # dark wood door
     )
 
-    room.interactables = [desk, panel, bed, door]
+    room.interactables = [desk, panel, couch, door]
 
     # Add the interactable rects as walls so the player can't walk through them
     for obj in room.interactables:
         room.walls.append(obj.rect)
 
-    # Some extra interior walls for atmosphere (table, bookshelf)
-    # Bookshelf along top-center
+    # Some extra interior walls for atmosphere (bookshelf)
     bookshelf_rect = pygame.Rect(ox + TILE * 9, TILE, TILE * 5, TILE)
     room.walls.append(bookshelf_rect)
 
@@ -166,3 +183,110 @@ def build_easy_room():
     start_y = room.pixel_h // 2 - 20
 
     return room, (start_x, start_y), bookshelf_rect
+
+
+def build_easy_room_from_tmx():
+    """
+    Build the Easy-level escape room from the EasyLevel1.tmx Tiled map.
+
+    The TMX map is 15×20 tiles (480×640 px).
+    Interactable objects are placed based on the named tile layers in the TMX:
+      - desk       → Caesar cipher puzzle
+      - lightboard → Binary lock puzzle
+      - couch      → String slicing puzzle
+      - escapedoor → Exit door (unlocks when all puzzles solved)
+
+    Returns:
+        (room, player_start_pos)
+    """
+    if not os.path.exists(EASY_TMX_PATH):
+        print("[Room] TMX file not found, falling back to legacy room.")
+        room, start, _ = build_easy_room()
+        return room, start
+
+    print("[Room] Loading TMX map...")
+    tiled_map = load_tmx(EASY_TMX_PATH)
+
+    room = Room(tiled_map.width, tiled_map.height)
+
+    # Pre-render the tile map
+    room.tmx_surface = tiled_map.render()
+
+    # === Build wall collisions from the border layer =========================
+    # The border layer has tiles around the perimeter — use those as walls.
+    border_positions = tiled_map.get_layer_tile_positions("border")
+    if border_positions:
+        for col, row in border_positions:
+            wall_rect = pygame.Rect(col * TILE, row * TILE, TILE, TILE)
+            room.walls.append(wall_rect)
+    else:
+        # Fallback: simple perimeter walls
+        room.build_walls_border()
+
+    # === Interactable Objects from TMX layers ================================
+
+    # Desk — layer "desk" — Caesar cipher puzzle
+    desk_rect = tiled_map.get_layer_bounding_rect("desk")
+    if desk_rect:
+        desk = Interactable(
+            rect=desk_rect,
+            label="Desk",
+            puzzle_id="caesar_cipher",
+            color=(139, 90, 43),
+        )
+        room.interactables.append(desk)
+        room.walls.append(desk_rect)
+
+    # Lightboard/Switchboard — layer "lightboard" — Binary lock puzzle
+    lb_rect = tiled_map.get_layer_bounding_rect("lightboard")
+    if lb_rect:
+        panel = Interactable(
+            rect=lb_rect,
+            label="Switchboard",
+            puzzle_id="binary_lock",
+            color=(60, 60, 90),
+        )
+        room.interactables.append(panel)
+        room.walls.append(lb_rect)
+
+    # Couch — layer "couch" — String slicing puzzle
+    couch_rect = tiled_map.get_layer_bounding_rect("couch")
+    if couch_rect:
+        couch = Interactable(
+            rect=couch_rect,
+            label="Couch",
+            puzzle_id="couch_slicing",
+            color=(120, 80, 80),
+        )
+        room.interactables.append(couch)
+        room.walls.append(couch_rect)
+
+    # Escape door — layer "escapedoor"
+    door_rect = tiled_map.get_layer_bounding_rect("escapedoor")
+    if door_rect:
+        door = Interactable(
+            rect=door_rect,
+            label="Door 🔒",
+            puzzle_id=None,
+            color=(100, 60, 40),
+        )
+        room.interactables.append(door)
+        # Don't add the door as a wall — the player needs to walk to it
+
+    # === Additional collision rects from furniture layers ====================
+    # These are non-interactable objects the player should not walk through
+    furniture_layers = [
+        "coffeetable", "drawer", "anotherplant", "box1", "box2", "box3",
+        "talllamp", "globe", "lamp",
+    ]
+    for layer_name in furniture_layers:
+        rect = tiled_map.get_layer_bounding_rect(layer_name)
+        if rect:
+            room.walls.append(rect)
+
+    # === Player start position ==============================================
+    # Place the player in an open floor area (around tile 7, 12 — center-ish)
+    start_x = 7 * TILE - 14
+    start_y = 12 * TILE - 20
+
+    return room, (start_x, start_y)

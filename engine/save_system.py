@@ -11,7 +11,8 @@ SAVE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 SAVE_FILE = os.path.join(SAVE_DIR, "savegame.json")
 
 
-def save_game(player_name, current_room, puzzles_solved, player_pos):
+def save_game(player_name, current_room, puzzles_solved, player_pos,
+              sprite_id="finn"):
     """
     Save current game state to JSON.
 
@@ -20,6 +21,7 @@ def save_game(player_name, current_room, puzzles_solved, player_pos):
         current_room:   str — e.g. "easy_room"
         puzzles_solved: list[str] — IDs of solved puzzles
         player_pos:     tuple(int, int) — player x, y
+        sprite_id:      str — "finn" or "maeve"
     """
     os.makedirs(SAVE_DIR, exist_ok=True)
 
@@ -28,6 +30,7 @@ def save_game(player_name, current_room, puzzles_solved, player_pos):
         "current_room": current_room,
         "puzzles_solved": list(puzzles_solved),
         "player_position": list(player_pos),
+        "sprite_id": sprite_id,
         "timestamp": datetime.now().isoformat(),
     }
 
@@ -35,6 +38,7 @@ def save_game(player_name, current_room, puzzles_solved, player_pos):
         json.dump(data, f, indent=2)
 
     return True
+
 
 
 def load_game():
