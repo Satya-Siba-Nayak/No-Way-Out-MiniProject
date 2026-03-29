@@ -90,3 +90,59 @@ PUZZLE_REGISTRY = {
     "binary_lock": BinaryLockPuzzle,
     "bed_slicing": BedSlicingPuzzle,
 }
+
+"""
+Medium Puzzles:
+1.Player has to guess the last number in the given fibonacci series
+def puzzle_fibonacci_safe():
+    # Sequence: 1(1), 1(2), 2(3), 3(4), 5(5), 8(6), 13(7), 21(8), 34(9), 55(10)
+    sequence = [1, 1]
+    for i in range(8):
+        sequence.append(sequence[-1] + sequence[-2])
+    solution = sequence[9]
+    
+    print("--- THE BRASS SAFE ---")
+    print("The numbers 1, 1, 2, 3, 5, 8 are etched into the dial.")
+    print("Clue: 'The tenth step completes the circle.'")
+    
+    guess = input("Enter the 10th number: ")
+    if guess == str(solution):
+        print("Click! The safe door swings open.")
+        return True
+    return False
+
+2.On the coffee table there are 4 objects: open book, plant, pen, and stone.
+A shadow chart in the open book shows the correct positions (not just order).
+Player must arrange the 4 items in the exact positions shown in the shadow diagram.
+Animation: When correct, a soft light shines from the lamp onto the table + a compartment opens.
+Python Logic:
+Pythoncorrect_positions = {
+    "book": (1, 2),
+    "plant": (3, 1),
+    "pen": (2, 3),
+    "stone": (4, 2)
+}
+
+if table_objects == correct_positions:
+    show_message("The shadows match perfectly!")
+    coffee_table_compartment_open = True
+    add_item("cipher_note")
+
+3.Three coins (small, medium, large) are scattered. A wooden box on the coffee table has three slots.
+Note says: “Smallest to largest.”
+Tiled Setup Tips
+
+Coffee table object named coin_box
+Add property required_order = "small,medium,large"
+
+Python Logic
+Pythoncorrect_order = ["small", "medium", "large"]
+
+if coins_in_box == correct_order:
+    coin_box_sprite.set_frame(1)           # open frame
+    show_message("The box clicks open!")
+    add_item("silver_key")
+
+4.
+
+"""
