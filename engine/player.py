@@ -33,9 +33,9 @@ SPRITE_CHARS = {
 }
 
 # Target sprite size in-game (scaled down from the large originals)
-# ~2 tiles wide, ~3 tiles tall — clearly visible to the user
-SPRITE_W = 64
-SPRITE_H = 96
+# ~3 tiles wide, ~4.5 tiles tall — very large and prominent
+SPRITE_W = 96
+SPRITE_H = 144
 
 
 def load_sprite_images(sprite_id):
@@ -103,8 +103,8 @@ class Player:
     WIDTH = SPRITE_W
     HEIGHT = SPRITE_H
     # Collision box is smaller than the visual sprite for smoother movement
-    COLLIDE_W = 40
-    COLLIDE_H = 40
+    COLLIDE_W = 50
+    COLLIDE_H = 50
     SPEED = 160          # pixels per second
     COLOR = (100, 200, 255)           # light-blue placeholder
     OUTLINE_COLOR = (50, 120, 180)    # darker outline
