@@ -165,6 +165,8 @@ class RoomState(State):
         self.player.rect.clamp_ip(
             pygame.Rect(0, 0, self.room.pixel_w, self.room.pixel_h)
         )
+        self.player.pos_x = float(self.player.rect.x)
+        self.player.pos_y = float(self.player.rect.y)
 
         # Check proximity to interactables
         self.nearby_obj = self.room.get_nearby_interactable(self.player.rect)

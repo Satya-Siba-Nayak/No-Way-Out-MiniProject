@@ -16,10 +16,11 @@ SPRITE_CHARS = {
         "name": "Finn",
         "folder": os.path.join(_BASE_DIR, "data", "Sprite 1(Finn)"),
         "pfp": "PFP.png",
-        "down": "User Facing.png",
-        "up": "Away Facing.png",
-        "left": "Left Facing.png",
-        "right": "Right Facing.png",
+        "sheet": "sprite sheet ( finn).png",
+        "idle_down": "User Facing.png",
+        "idle_up": "Away Facing.png",
+        "idle_left": "Left Facing.png",
+        "idle_right": "Right Facing.png",
     },
     "maeve": {
         "name": "Maeve",
@@ -53,19 +54,64 @@ def load_sprite_images(sprite_id):
     folder = config["folder"]
     images = {}
 
-    for direction in ("up", "down", "left", "right"):
-        filename = config[direction]
-        path = os.path.join(folder, filename)
-        if os.path.exists(path):
+    if "sheet" in config:
+        sheet_path = os.path.join(folder, config["sheet"])
+        if os.path.exists(sheet_path):
             try:
-                img = pygame.image.load(path).convert_alpha()
-                # Scale down to game size
-                img = pygame.transform.smoothscale(img, (SPRITE_W, SPRITE_H))
-                images[direction] = img
+                sheet = pygame.image.load(sheet_path).convert_alpha()
+                sheet_w, sheet_h = sheet.get_size()
+                
+                num_frames = 4
+                frame_w = sheet_w // num_frames
+                frame_h = sheet_h // 4
+                
+                row_map = {"down": 0, "up": 1, "left": 2, "right": 3}
+                
+                for direction, row in row_map.items():
+                    direction_frames = []
+                    for i in range(num_frames):
+                        rect = pygame.Rect(i * frame_w, row * frame_h, frame_w, frame_h)
+                        frame_surf = sheet.subsurface(rect)
+                        frame_surf = pygame.transform.smoothscale(frame_surf, (SPRITE_W, SPRITE_H))
+                        direction_frames.append(frame_surf)
+                    images[direction] = direction_frames
             except pygame.error as e:
-                print(f"[Player] WARNING: failed to load {path}: {e}")
+                print(f"[Player] WARNING: failed to load sheet {sheet_path}: {e}")
         else:
-            print(f"[Player] WARNING: sprite not found: {path}")
+            print(f"[Player] WARNING: sheet not found: {sheet_path}")
+            
+    else:
+        # Fallback for individual directional files (e.g. Maeve still uses this if she's not updated)
+        for direction in ("up", "down", "left", "right"):
+            filename = config.get(direction)
+            if not filename:
+                continue
+            path = os.path.join(folder, filename)
+            if os.path.exists(path):
+                try:
+                    sheet = pygame.image.load(path).convert_alpha()
+                    sheet_w, sheet_h = sheet.get_size()
+                    
+                    num_frames = 4
+                    frame_w = sheet_w // num_frames
+                    
+                    if sheet_h > frame_w * 2: 
+                        frame_h = sheet_h // 4
+                    else:
+                        frame_h = sheet_h
+                    
+                    direction_frames = []
+                    for i in range(num_frames):
+                        rect = pygame.Rect(i * frame_w, 0, frame_w, frame_h)
+                        frame_surf = sheet.subsurface(rect)
+                        frame_surf = pygame.transform.smoothscale(frame_surf, (SPRITE_W, SPRITE_H))
+                        direction_frames.append(frame_surf)
+                        
+                    images[direction] = direction_frames
+                except pygame.error as e:
+                    print(f"[Player] WARNING: failed to load {path}: {e}")
+            else:
+                print(f"[Player] WARNING: sprite not found: {path}")
 
     return images if images else None
 
@@ -97,6 +143,41 @@ def load_pfp(sprite_id, size=(100, 100)):
         return None
 
 
+def load_idle_images(sprite_id):
+    """
+    Load specific single-frame idle images if defined in config,
+    scaling them properly to the game size.
+    """
+    config = SPRITE_CHARS.get(sprite_id)
+    if not config:
+        return None
+        
+    folder = config["folder"]
+    idle_images = {}
+    
+    for direction in ("up", "down", "left", "right"):
+        key = f"idle_{direction}"
+        if key in config:
+            path = os.path.join(folder, config[key])
+            if os.path.exists(path):
+                try:
+                    img = pygame.image.load(path).convert_alpha()
+                    # Crop idle image to its actual bounding box to remove extra padding
+                    bbox = img.get_bounding_rect()
+                    img = img.subsurface(bbox)
+                    
+                    # Scale it such that the physical character height matches the animated frame's physical character height (~130px)
+                    target_h = 130
+                    scale = target_h / float(bbox.h)
+                    target_w = int(bbox.w * scale)
+                    img = pygame.transform.smoothscale(img, (target_w, target_h))
+                    idle_images[direction] = img
+                except pygame.error as e:
+                    print(f"[Player] WARNING: failed to load idle {path}: {e}")
+                    
+    return idle_images if idle_images else None
+
+
 class Player:
     """The player character."""
 
@@ -112,13 +193,25 @@ class Player:
     def __init__(self, x, y, sprite_id=None):
         # The collision rect is centered at the bottom of the sprite
         self.rect = pygame.Rect(x, y, self.COLLIDE_W, self.COLLIDE_H)
+        
+        # Use float variables to track actual position without losing sub-pixel precision
+        self.pos_x = float(x)
+        self.pos_y = float(y)
+        
         self.direction = "down"       # last facing direction
         self.sprite_id = sprite_id
 
+        # Animation state
+        self.frame_index = 0.0
+        self.anim_speed = 6.0 # frames per second
+        self.is_moving = False
+        
         # Load sprite images if a sprite_id is given
         self.sprites = None
+        self.idle_sprites = None
         if sprite_id:
             self.sprites = load_sprite_images(sprite_id)
+            self.idle_sprites = load_idle_images(sprite_id)
 
     # --- Movement -----------------------------------------------------------
 
@@ -144,31 +237,62 @@ class Player:
         keys = pygame.key.get_pressed()
         vx, vy = self.handle_input(keys)
 
+        old_x, old_y = self.rect.x, self.rect.y
+
         # Horizontal movement + collision
-        self.rect.x += int(vx * dt)
+        self.pos_x += vx * dt
+        self.rect.x = int(round(self.pos_x))
         for wall in walls:
             if self.rect.colliderect(wall):
                 if vx > 0:
                     self.rect.right = wall.left
                 elif vx < 0:
                     self.rect.left = wall.right
+                # Sync float pos to actual integer pos if collision happens
+                self.pos_x = float(self.rect.x)
 
         # Vertical movement + collision
-        self.rect.y += int(vy * dt)
+        self.pos_y += vy * dt
+        self.rect.y = int(round(self.pos_y))
         for wall in walls:
             if self.rect.colliderect(wall):
                 if vy > 0:
                     self.rect.bottom = wall.top
                 elif vy < 0:
                     self.rect.top = wall.bottom
+                # Sync float pos to actual integer pos if collision happens
+                self.pos_y = float(self.rect.y)
+                
+        # Check actual physical displacement indicating non-obstructed moving
+        self.is_moving = (self.rect.x != old_x) or (self.rect.y != old_y)
+        
+        # Animation update: only advance frames if actually moving (not stuck)
+        if self.is_moving:
+            self.frame_index += self.anim_speed * dt
+            if self.frame_index >= 4:
+                self.frame_index = 0.0
+        else:
+            self.frame_index = 0.0 # reset to idle frame
 
     # --- Drawing ------------------------------------------------------------
 
     def draw(self, surface):
         """Draw the player — uses sprite images if available, else placeholder."""
         if self.sprites and self.direction in self.sprites:
-            sprite_img = self.sprites[self.direction]
-            surface.blit(sprite_img, self.rect.topleft)
+            # If we're not moving and have a dedicated idle sprite, use it!
+            if not self.is_moving and self.idle_sprites and self.direction in self.idle_sprites:
+                sprite_img = self.idle_sprites[self.direction]
+            else:
+                frames = self.sprites[self.direction]
+                idx = int(self.frame_index) % len(frames)
+                sprite_img = frames[idx]
+            
+            # Align the bottom of the sprite image with the bottom of the collision rect
+            # Center the sprite horizontally on the collision rect
+            draw_x = self.rect.centerx - (sprite_img.get_width() // 2)
+            draw_y = self.rect.bottom - sprite_img.get_height()
+            
+            surface.blit(sprite_img, (draw_x, draw_y))
         else:
             self._draw_placeholder(surface)
 
