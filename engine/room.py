@@ -16,6 +16,9 @@ _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EASY_TMX_PATH = os.path.join(
     _BASE_DIR, "Maps", "Level 1", "Tiled images", "EasyLevel1.tmx"
 )
+LEVEL2_TMX_PATH = os.path.join(
+    _BASE_DIR, "Maps", "Level 2", "Tiled images", "HallwayLevel2.tmx"
+)
 
 
 class Interactable:
@@ -290,3 +293,96 @@ def build_easy_room_from_tmx():
     start_y = 12 * TILE - 20
 
     return room, (start_x, start_y)
+
+
+def build_level2_room_from_tmx():
+    """Build the Level 2 escape room from HallwayLevel2.tmx."""
+    if not os.path.exists(LEVEL2_TMX_PATH):
+        print("[Room] Level 2 TMX file not found.")
+        # Fallback to empty room
+        return Room(15, 20), (100, 100)
+
+    print("[Room] Loading Level 2 TMX map...")
+    tiled_map = load_tmx(LEVEL2_TMX_PATH)
+    room = Room(tiled_map.width, tiled_map.height)
+    room.tmx_surface = tiled_map.render()
+
+    # Border walls
+    border_positions = tiled_map.get_layer_tile_positions("border")
+    if border_positions:
+        for col, row in border_positions:
+            room.walls.append(pygame.Rect(col * TILE, row * TILE, TILE, TILE))
+    else:
+        room.build_walls_border()
+
+    # Door 2 — Blinking lights puzzle
+    door2_rect = tiled_map.get_layer_bounding_rect("door2")
+    if door2_rect:
+        door2 = Interactable(
+            rect=door2_rect,
+            label="Door",
+            puzzle_id="blinking_lights",
+            color=(100, 100, 100)
+        )
+        room.interactables.append(door2)
+        room.walls.append(door2_rect)
+
+    # Bump — Misplaced tile puzzle
+    bump_rect = tiled_map.get_layer_bounding_rect("bump")
+    if bump_rect:
+        bump = Interactable(
+            rect=bump_rect,
+            label="Loose Tile",
+            puzzle_id="misplaced_tile",
+            color=(80, 80, 80)
+        )
+        room.interactables.append(bump)
+        # It's a floor tile, so maybe not a wall
+
+    # Painting — Painting puzzle
+    painting_rect = tiled_map.get_layer_bounding_rect("painting")
+    if painting_rect:
+        painting = Interactable(
+            rect=painting_rect,
+            label="Eerie Painting",
+            puzzle_id="painting_code",
+            color=(100, 50, 50)
+        )
+        room.interactables.append(painting)
+        room.walls.append(painting_rect)
+
+    # Gate — initially blocks path
+    gate_rect = tiled_map.get_layer_bounding_rect("gate")
+    if gate_rect:
+        gate = Interactable(
+            rect=gate_rect,
+            label="Closed Gate",
+            puzzle_id=None,
+            color=(60, 60, 60)
+        )
+        # Note: We'll identify it by label in room_state to hide/show it
+        room.interactables.append(gate)
+        room.walls.append(gate_rect)
+
+    # Elevator — exit
+    elevator_rect = tiled_map.get_layer_bounding_rect("elevator")
+    if elevator_rect:
+        elevator = Interactable(
+            rect=elevator_rect,
+            label="Elevator 🔒",
+            puzzle_id=None,
+            color=(80, 80, 90)
+        )
+        room.interactables.append(elevator)
+        # Don't wall the front of the elevator so player can interact easily? 
+        # But maybe still wall the exact rect so player doesn't wander in.
+        # Actually in level 1 door was not a wall.
+
+    # Player start position (easyleveldoor)
+    start_pos = (150, 150)
+    start_rect = tiled_map.get_layer_bounding_rect("easyleveldoor")
+    if start_rect:
+        start_pos = (start_rect.centerx - 14, start_rect.centery - 20)
+
+    return room, start_pos
+

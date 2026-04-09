@@ -5,6 +5,7 @@ Renders as a dark overlay with a panel, the puzzle description, and a
 text input field. Wraps Keya's puzzle classes from puzzles/easy_puzzles.py.
 """
 
+import os
 import sys
 import pygame
 from states.base_state import State
@@ -19,6 +20,7 @@ class PuzzleState(State):
         self.puzzle_id = puzzle_id
         self.room_state = room_state    # callback reference
         self.puzzle = None
+        self.puzzle_image = None
         self.user_input = ""
         self.feedback = ""
         self.feedback_color = (255, 255, 255)
@@ -42,6 +44,17 @@ class PuzzleState(State):
         puzzle_cls = PUZZLE_REGISTRY.get(self.puzzle_id)
         if puzzle_cls:
             self.puzzle = puzzle_cls()
+            if hasattr(self.puzzle, "image_path") and os.path.exists(self.puzzle.image_path):
+                try:
+                    img = pygame.image.load(self.puzzle.image_path).convert_alpha()
+                    # Scale down if needed to fit on the right side of the panel (e.g. 340x340 max)
+                    iw, ih = img.get_size()
+                    scale = min(340 / iw, 340 / ih)
+                    if scale < 1.0:
+                        img = pygame.transform.smoothscale(img, (int(iw * scale), int(ih * scale)))
+                    self.puzzle_image = img
+                except Exception as e:
+                    print(f"[PuzzleState] Failed to load image {self.puzzle.image_path}: {e}")
         else:
             # Unknown puzzle — just pop back
             self.machine.pop()
@@ -109,7 +122,7 @@ class PuzzleState(State):
             return
 
         # Panel background
-        panel_w, panel_h = 600, 360
+        panel_w, panel_h = 700, 420
         panel_x = (w - panel_w) // 2
         panel_y = (h - panel_h) // 2
 
@@ -139,6 +152,13 @@ class PuzzleState(State):
             txt = self.font.render(line, True, self.WHITE)
             surface.blit(txt, (panel_x + 25, y))
             y += 24
+
+        # Puzzle image
+        if self.puzzle_image:
+            img_x = panel_x + panel_w - self.puzzle_image.get_width() - 20
+            img_y = panel_y + 55
+            # Center vertically somewhat if there's height
+            surface.blit(self.puzzle_image, (img_x, img_y))
 
         # Input area
         input_y = panel_y + panel_h - 100

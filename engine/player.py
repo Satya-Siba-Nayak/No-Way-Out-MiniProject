@@ -200,6 +200,7 @@ class Player:
         
         self.direction = "down"       # last facing direction
         self.sprite_id = sprite_id
+        self.render_scale = 1.0       # allow resizing the drawn sprite
 
         # Animation state
         self.frame_index = 0.0
@@ -286,6 +287,12 @@ class Player:
                 frames = self.sprites[self.direction]
                 idx = int(self.frame_index) % len(frames)
                 sprite_img = frames[idx]
+            
+            # Apply render_scale dynamically if needed
+            if getattr(self, "render_scale", 1.0) != 1.0:
+                w = int(sprite_img.get_width() * self.render_scale)
+                h = int(sprite_img.get_height() * self.render_scale)
+                sprite_img = pygame.transform.smoothscale(sprite_img, (w, h))
             
             # Align the bottom of the sprite image with the bottom of the collision rect
             # Center the sprite horizontally on the collision rect

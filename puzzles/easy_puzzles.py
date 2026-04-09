@@ -85,12 +85,18 @@ class CouchSlicingPuzzle:
 
 
 # Registry — maps puzzle_id to its class
+from puzzles.level2_puzzles import BlinkingLightsPuzzle, MisplacedTilePuzzle, PaintingPuzzle
+
 PUZZLE_REGISTRY = {
     "caesar_cipher": CaesarCipherPuzzle,
     "binary_lock": BinaryLockPuzzle,
     "couch_slicing": CouchSlicingPuzzle,
     # Keep backward compatibility with old save files
     "bed_slicing": CouchSlicingPuzzle,
+    # Level 2 Puzzles
+    "blinking_lights": BlinkingLightsPuzzle,
+    "misplaced_tile": MisplacedTilePuzzle,
+    "painting_code": PaintingPuzzle,
 }
 
 """

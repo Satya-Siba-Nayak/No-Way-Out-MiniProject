@@ -223,6 +223,7 @@ class MenuState(State):
                 delete_save()
                 self.ctx["player_name"] = self.player_name.strip()
                 self.ctx["load_save"] = False
+                self.ctx["current_level"] = "level1"
                 self.phase = "char_select"
                 self.char_idx = 0
             elif choice == "Continue":
@@ -231,6 +232,7 @@ class MenuState(State):
                 self.ctx["load_save"] = True
                 self.ctx["save_data"] = save_data
                 self.ctx["sprite_id"] = save_data.get("sprite_id", "finn")
+                self.ctx["current_level"] = save_data.get("current_room", "level1")
                 self._start_game()
         elif event.key == pygame.K_BACKSPACE or event.key == pygame.K_ESCAPE:
             self.phase = "name_input"
