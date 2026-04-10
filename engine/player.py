@@ -15,8 +15,10 @@ SPRITE_CHARS = {
     "finn": {
         "name": "Finn",
         "folder": os.path.join(_BASE_DIR, "data", "Sprite 1(Finn)"),
-        "pfp": "PFP.png",
-        "sheet": "sprite sheet ( finn).png",
+        "pfp": "finn_pfp_processed.png",
+        "sheet": "finn_sheet_processed.png",
+        "num_frames": 3,
+        "row_map": {"up": 0, "left": 1, "down": 2, "right": 3},
         "idle_down": "User Facing.png",
         "idle_up": "Away Facing.png",
         "idle_left": "Left Facing.png",
@@ -61,11 +63,11 @@ def load_sprite_images(sprite_id):
                 sheet = pygame.image.load(sheet_path).convert_alpha()
                 sheet_w, sheet_h = sheet.get_size()
                 
-                num_frames = 4
+                num_frames = config.get("num_frames", 4)
                 frame_w = sheet_w // num_frames
                 frame_h = sheet_h // 4
                 
-                row_map = {"down": 0, "up": 1, "left": 2, "right": 3}
+                row_map = config.get("row_map", {"down": 0, "up": 1, "left": 2, "right": 3})
                 
                 for direction, row in row_map.items():
                     direction_frames = []
@@ -74,6 +76,11 @@ def load_sprite_images(sprite_id):
                         frame_surf = sheet.subsurface(rect)
                         frame_surf = pygame.transform.smoothscale(frame_surf, (SPRITE_W, SPRITE_H))
                         direction_frames.append(frame_surf)
+                    
+                    if num_frames == 3:
+                        # Make it ping-pong loop: left, stand, right, stand
+                        direction_frames = [direction_frames[0], direction_frames[1], direction_frames[2], direction_frames[1]]
+                        
                     images[direction] = direction_frames
             except pygame.error as e:
                 print(f"[Player] WARNING: failed to load sheet {sheet_path}: {e}")

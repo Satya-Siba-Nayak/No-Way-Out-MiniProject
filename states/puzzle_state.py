@@ -50,8 +50,7 @@ class PuzzleState(State):
                     # Scale down if needed to fit on the right side of the panel (e.g. 340x340 max)
                     iw, ih = img.get_size()
                     scale = min(340 / iw, 340 / ih)
-                    if scale < 1.0:
-                        img = pygame.transform.smoothscale(img, (int(iw * scale), int(ih * scale)))
+                    img = pygame.transform.scale(img, (int(iw * scale), int(ih * scale)))
                     self.puzzle_image = img
                 except Exception as e:
                     print(f"[PuzzleState] Failed to load image {self.puzzle.image_path}: {e}")
