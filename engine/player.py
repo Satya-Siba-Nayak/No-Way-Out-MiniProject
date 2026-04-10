@@ -27,11 +27,10 @@ SPRITE_CHARS = {
     "maeve": {
         "name": "Maeve",
         "folder": os.path.join(_BASE_DIR, "data", "Sprite 2 (Maeve)"),
-        "pfp": "PFP.png",
-        "down": "User Facing.png",
-        "up": "Away Facing.png",
-        "left": "Left Facing.png",
-        "right": "Right Facing.png",
+        "pfp": "maeve_pfp_processed.png",
+        "sheet": "maeve_sheet_processed.png",
+        "num_frames": 3,
+        "row_map": {"up": 0, "left": 1, "down": 2, "right": 3},
     },
 }
 
