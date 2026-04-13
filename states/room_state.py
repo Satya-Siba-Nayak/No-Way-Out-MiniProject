@@ -29,6 +29,28 @@ class RoomState(State):
         self.bump_msg_timer = 0.0
         self.blink_timer = 0.0
 
+        # Per-light blink pattern: (light_index, blink_count)
+        # Light 0 blinks 3×, Light 1 blinks 2×, Light 2 blinks 4×  → answer "324"
+        self.BLINK_PATTERN = [(0, 3), (1, 2), (2, 4)]
+        self.BLINK_ON = 0.4      # seconds light is ON
+        self.BLINK_OFF = 0.4     # seconds light is OFF
+        self.BLINK_PERIOD = self.BLINK_ON + self.BLINK_OFF  # 0.8s per blink
+        self.PAUSE_BETWEEN = 1.0  # pause between different lights
+        self.PAUSE_END = 2.0      # pause at end of full cycle
+        self.GLOW_COLORS = [
+            (255, 180, 50),   # amber / warm
+            (80, 255, 120),   # green
+            (100, 150, 255),  # blue
+        ]
+        # Pre-compute total cycle duration
+        self._blink_cycle_duration = 0.0
+        for i, (_, count) in enumerate(self.BLINK_PATTERN):
+            self._blink_cycle_duration += count * self.BLINK_PERIOD
+            if i < len(self.BLINK_PATTERN) - 1:
+                self._blink_cycle_duration += self.PAUSE_BETWEEN
+            else:
+                self._blink_cycle_duration += self.PAUSE_END
+
         # TMX scaling
         self.scale = 1.0
         self.offset_x = 0
@@ -184,19 +206,27 @@ class RoomState(State):
         self._check_door()
         self._auto_save()
 
-    def _get_blinking_light_color(self):
-        """Returns the current RGBA tint for the Level 2 hallway lights based on the timer."""
-        t = self.blink_timer
-        if t < 3.0:
-            if (t % 1.0) < 0.5:
-                return (200, 0, 0, 60)  # Red
-        elif t < 5.0:
-            if (t % 1.0) < 0.5:
-                return (0, 200, 0, 60)  # Green
-        elif t < 9.0:
-            if (t % 1.0) < 0.5:
-                return (0, 0, 200, 60)  # Blue
-        return None
+    def _get_active_light(self):
+        """Return (light_index, is_on) for the current blink phase, or (None, False) during pauses."""
+        t = self.blink_timer % self._blink_cycle_duration
+        elapsed = 0.0
+        for light_idx, count in self.BLINK_PATTERN:
+            blink_duration = count * self.BLINK_PERIOD
+            if t < elapsed + blink_duration:
+                local_t = t - elapsed
+                within_blink = local_t % self.BLINK_PERIOD
+                is_on = within_blink < self.BLINK_ON
+                return light_idx, is_on
+            elapsed += blink_duration
+            # Check if we're in the pause after this light
+            if light_idx != self.BLINK_PATTERN[-1][0]:
+                if t < elapsed + self.PAUSE_BETWEEN:
+                    return None, False
+                elapsed += self.PAUSE_BETWEEN
+            else:
+                # End pause
+                return None, False
+        return None, False
 
     # --- Update -------------------------------------------------------------
 
@@ -205,7 +235,7 @@ class RoomState(State):
             self.bump_msg_timer -= dt
 
         if self.ctx.get("current_level") == "level2" and "blinking_lights" not in self.puzzles_solved:
-            self.blink_timer = (self.blink_timer + dt) % 11.0
+            self.blink_timer += dt
 
         if self.won:
             self.win_timer += dt
@@ -280,13 +310,20 @@ class RoomState(State):
 
         surface.blit(scaled_surf, (self.offset_x, self.offset_y))
 
-        # Ambient blinking lights for Level 2 hallway
+        # Per-light blinking glow for Level 2 hallway
         if self.ctx.get("current_level") == "level2" and "blinking_lights" not in self.puzzles_solved:
-            color = self._get_blinking_light_color()
-            if color:
-                light_overlay = pygame.Surface((scaled_w, scaled_h), pygame.SRCALPHA)
-                light_overlay.fill(color)
-                surface.blit(light_overlay, (self.offset_x, self.offset_y))
+            active_light, is_on = self._get_active_light()
+            if active_light is not None and is_on and active_light < len(self.room.light_positions):
+                light_rect = self.room.light_positions[active_light]
+                color = self.GLOW_COLORS[active_light]
+                # Draw a glow circle on the SCALED surface at the scaled position
+                cx = int(light_rect.centerx * self.scale) + self.offset_x
+                cy = int(light_rect.centery * self.scale) + self.offset_y
+                radius = int(28 * self.scale)
+                glow_size = radius * 2 + 4
+                glow_surf = pygame.Surface((glow_size, glow_size), pygame.SRCALPHA)
+                pygame.draw.circle(glow_surf, (*color, 140), (glow_size // 2, glow_size // 2), radius)
+                surface.blit(glow_surf, (cx - glow_size // 2, cy - glow_size // 2))
 
         # --- HUD bar at bottom ---
         hud_rect = pygame.Rect(0, h - self.hud_height, w, self.hud_height)

@@ -1,22 +1,21 @@
 import os
 
 class BlinkingLightsPuzzle:
-    """Puzzle 1 (Level 2) — Observe the blinking lights and determine the count."""
+    """Puzzle 1 (Level 2) — Observe the 3 hallway lights blinking in a pattern."""
 
     PUZZLE_ID = "blinking_lights"
     TITLE = "THE BLINKING LIGHTS"
 
     def __init__(self):
-        self.solution = "324"  # For example: 3 red, 2 green, 4 blue
+        self.solution = "324"  # Light 1 blinks 3×, Light 2 blinks 2×, Light 3 blinks 4×
 
         self.description = [
-            "A panel on the door flashes a pattern of colored lights in a loop.",
+            "Three lights in the hallway are blinking in a strange pattern.",
             "",
-            "It flashes Red 3 times...",
-            "Then Green 2 times...",
-            "Then Blue 4 times...",
+            "Watch carefully — each light blinks a specific number of times",
+            "before the next one starts.",
             "",
-            "A keypad asks for a 3-digit code."
+            "Count the blinks for each light in order and enter the 3-digit code.",
         ]
 
     def check_answer(self, answer):
@@ -55,7 +54,7 @@ class PaintingPuzzle:
     def __init__(self):
         self.solution = "1379"
         
-        # We will parse this in PuzzleState to actually draw the image.
+        # Painting.png lives in the original Level 2 assets directory
         _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.image_path = os.path.join(_BASE_DIR, "Maps", "Level 2", "Painting.png")
 

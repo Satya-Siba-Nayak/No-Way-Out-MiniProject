@@ -1,11 +1,11 @@
 {
-  "player_name": "bdkjf",
-  "current_room": "level1",
+  "player_name": "Satya",
+  "current_room": "level2",
   "puzzles_solved": [],
   "player_position": [
-    238,
-    302
+    130,
+    476
   ],
-  "sprite_id": "maeve",
-  "timestamp": "2026-04-10T10:51:35.380550"
+  "sprite_id": "finn",
+  "timestamp": "2026-04-13T09:16:07.520251"
 }

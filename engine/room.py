@@ -17,7 +17,7 @@ EASY_TMX_PATH = os.path.join(
     _BASE_DIR, "Maps", "Level 1", "Tiled images", "EasyLevel1.tmx"
 )
 LEVEL2_TMX_PATH = os.path.join(
-    _BASE_DIR, "Maps", "Level 2", "Tiled images", "HallwayLevel2.tmx"
+    _BASE_DIR, "Maps", "Level 2 - new", "Tiled images", "HallwayLevel2.tmx"
 )
 
 
@@ -54,6 +54,7 @@ class Room:
         self.pixel_h = height_tiles * TILE
         self.walls = []               # list of pygame.Rect (collision)
         self.interactables = []       # list of Interactable
+        self.light_positions = []     # list of pygame.Rect (for blinking lights)
         self.floor_color = (60, 55, 50)
         self.wall_color = (90, 80, 70)
 
@@ -377,6 +378,13 @@ def build_level2_room_from_tmx():
         # Don't wall the front of the elevator so player can interact easily? 
         # But maybe still wall the exact rect so player doesn't wander in.
         # Actually in level 1 door was not a wall.
+
+    # Light positions for blinking animation
+    light_layer_names = ["mediumlamplight", "mediumlamplight2", "mediumlamplight3"]
+    for ln in light_layer_names:
+        rect = tiled_map.get_layer_bounding_rect(ln)
+        if rect:
+            room.light_positions.append(rect)
 
     # Player start position (easyleveldoor)
     start_pos = (150, 150)
