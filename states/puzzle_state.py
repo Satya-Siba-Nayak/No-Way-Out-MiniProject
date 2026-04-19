@@ -3,6 +3,11 @@ Puzzle State — overlay UI that lets the player solve a puzzle.
 
 Renders as a dark overlay with a panel, the puzzle description, and a
 text input field. Wraps Keya's puzzle classes from puzzles/easy_puzzles.py.
+
+Features:
+  - Puzzle image shown as a thumbnail below the text
+  - Press [TAB] or click the thumbnail to enlarge the image full-screen
+  - Press any key / click again to close the enlarged view
 """
 
 import os
@@ -21,6 +26,8 @@ class PuzzleState(State):
         self.room_state = room_state    # callback reference
         self.puzzle = None
         self.puzzle_image = None
+        self.puzzle_image_full = None   # larger version for zoomed view
+        self.image_zoomed = False       # is the image currently enlarged?
         self.user_input = ""
         self.feedback = ""
         self.feedback_color = (255, 255, 255)
@@ -46,12 +53,22 @@ class PuzzleState(State):
             self.puzzle = puzzle_cls()
             if hasattr(self.puzzle, "image_path") and os.path.exists(self.puzzle.image_path):
                 try:
-                    img = pygame.image.load(self.puzzle.image_path).convert_alpha()
-                    # Scale down if needed to fit on the right side of the panel (e.g. 340x340 max)
-                    iw, ih = img.get_size()
-                    scale = min(340 / iw, 340 / ih)
-                    img = pygame.transform.scale(img, (int(iw * scale), int(ih * scale)))
-                    self.puzzle_image = img
+                    raw = pygame.image.load(self.puzzle.image_path).convert_alpha()
+
+                    # Create thumbnail (small version to fit in panel)
+                    iw, ih = raw.get_size()
+                    thumb_max = 160
+                    scale = min(thumb_max / iw, thumb_max / ih)
+                    self.puzzle_image = pygame.transform.smoothscale(
+                        raw, (int(iw * scale), int(ih * scale)))
+
+                    # Create full-size version for zoomed view
+                    sw, sh = self.ctx["screen_w"], self.ctx["screen_h"]
+                    full_max = min(sw - 80, sh - 80)
+                    full_scale = min(full_max / iw, full_max / ih, 1.0)
+                    self.puzzle_image_full = pygame.transform.smoothscale(
+                        raw, (int(iw * full_scale), int(ih * full_scale)))
+
                 except Exception as e:
                     print(f"[PuzzleState] Failed to load image {self.puzzle.image_path}: {e}")
         else:
@@ -67,6 +84,11 @@ class PuzzleState(State):
                 sys.exit()
 
             if event.type == pygame.KEYDOWN:
+                # If image is zoomed, any key closes it
+                if self.image_zoomed:
+                    self.image_zoomed = False
+                    return
+
                 if self.solved:
                     # Any key closes after solving
                     self.machine.pop()
@@ -74,6 +96,11 @@ class PuzzleState(State):
 
                 if event.key == pygame.K_ESCAPE:
                     self.machine.pop()
+                    return
+
+                if event.key == pygame.K_TAB and self.puzzle_image:
+                    # Toggle image zoom
+                    self.image_zoomed = True
                     return
 
                 if event.key == pygame.K_RETURN:
@@ -84,6 +111,14 @@ class PuzzleState(State):
                 elif event.unicode.isprintable() and len(self.user_input) < 30:
                     self.user_input += event.unicode
                     self.feedback = ""
+
+            # Mouse click on thumbnail to enlarge
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if self.image_zoomed:
+                    self.image_zoomed = False
+                elif hasattr(self, '_thumb_rect') and self._thumb_rect and \
+                     self._thumb_rect.collidepoint(event.pos):
+                    self.image_zoomed = True
 
     def _submit(self):
         if not self.user_input.strip():
@@ -120,6 +155,11 @@ class PuzzleState(State):
         if not self.puzzle:
             return
 
+        # If image is zoomed in, draw it full screen and return
+        if self.image_zoomed and self.puzzle_image_full:
+            self._draw_zoomed_image(surface, w, h)
+            return
+
         # Panel background
         panel_w, panel_h = 700, 420
         panel_x = (w - panel_w) // 2
@@ -142,22 +182,57 @@ class PuzzleState(State):
         title = self.title_font.render(self.puzzle.TITLE, True, self.GOLD)
         surface.blit(title, title.get_rect(center=title_bar.center))
 
-        # Description text
+        # --- Layout: text on left, thumbnail on right ---
+        text_right_margin = panel_x + panel_w - 20
+        thumb_w = 0
+
+        # Draw thumbnail on the right side (if image exists)
+        self._thumb_rect = None
+        if self.puzzle_image:
+            thumb_w = self.puzzle_image.get_width() + 20
+            img_x = panel_x + panel_w - self.puzzle_image.get_width() - 15
+            img_y = panel_y + 50
+            # Draw a border around the thumbnail
+            border_rect = pygame.Rect(
+                img_x - 3, img_y - 3,
+                self.puzzle_image.get_width() + 6,
+                self.puzzle_image.get_height() + 6)
+            pygame.draw.rect(surface, (100, 90, 120), border_rect, 2)
+            surface.blit(self.puzzle_image, (img_x, img_y))
+            self._thumb_rect = border_rect
+
+            # "Click to enlarge" hint
+            hint = self.small_font.render("TAB / Click to enlarge", True, self.GRAY)
+            surface.blit(hint, hint.get_rect(
+                centerx=img_x + self.puzzle_image.get_width() // 2,
+                top=img_y + self.puzzle_image.get_height() + 5))
+
+            text_right_margin = img_x - 10
+
+        # Description text (wraps to avoid the thumbnail)
         y = panel_y + 55
+        max_text_w = text_right_margin - (panel_x + 25)
         for line in self.puzzle.description:
             if line == "":
                 y += 10
                 continue
-            txt = self.font.render(line, True, self.WHITE)
-            surface.blit(txt, (panel_x + 25, y))
-            y += 24
-
-        # Puzzle image
-        if self.puzzle_image:
-            img_x = panel_x + panel_w - self.puzzle_image.get_width() - 20
-            img_y = panel_y + 55
-            # Center vertically somewhat if there's height
-            surface.blit(self.puzzle_image, (img_x, img_y))
+            # Word-wrap long lines
+            words = line.split(' ')
+            current_line = ""
+            for word in words:
+                test = current_line + (" " if current_line else "") + word
+                test_surf = self.font.render(test, True, self.WHITE)
+                if test_surf.get_width() > max_text_w and current_line:
+                    txt = self.font.render(current_line, True, self.WHITE)
+                    surface.blit(txt, (panel_x + 25, y))
+                    y += 24
+                    current_line = word
+                else:
+                    current_line = test
+            if current_line:
+                txt = self.font.render(current_line, True, self.WHITE)
+                surface.blit(txt, (panel_x + 25, y))
+                y += 24
 
         # Input area
         input_y = panel_y + panel_h - 100
@@ -183,3 +258,24 @@ class PuzzleState(State):
                                           True, self.GRAY)
             surface.blit(hint, hint.get_rect(
                 center=(w // 2, panel_y + panel_h - 12)))
+
+    def _draw_zoomed_image(self, surface, w, h):
+        """Draw the puzzle image enlarged, centered on screen."""
+        # Darker overlay
+        dark = pygame.Surface((w, h), pygame.SRCALPHA)
+        dark.fill((0, 0, 0, 220))
+        surface.blit(dark, (0, 0))
+
+        img = self.puzzle_image_full
+        ix = (w - img.get_width()) // 2
+        iy = (h - img.get_height()) // 2
+
+        # White border
+        border = pygame.Rect(ix - 4, iy - 4, img.get_width() + 8, img.get_height() + 8)
+        pygame.draw.rect(surface, self.WHITE, border, 3)
+
+        surface.blit(img, (ix, iy))
+
+        # Close hint
+        hint = self.small_font.render("Press any key or click to close", True, self.GRAY)
+        surface.blit(hint, hint.get_rect(center=(w // 2, iy + img.get_height() + 25)))

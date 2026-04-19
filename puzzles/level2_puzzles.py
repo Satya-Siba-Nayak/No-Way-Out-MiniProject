@@ -56,7 +56,7 @@ class PaintingPuzzle:
         
         # Painting.png lives in the original Level 2 assets directory
         _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.image_path = os.path.join(_BASE_DIR, "Maps", "Level 2", "Painting.png")
+        self.image_path = os.path.join(_BASE_DIR, "Maps", "Level 2 - new", "Painting.png")
 
         self.description = [
             "You inspect the eerie painting hanging on the wall.",

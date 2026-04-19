@@ -30,18 +30,15 @@ class RoomState(State):
         self.blink_timer = 0.0
 
         # Per-light blink pattern: (light_index, blink_count)
-        # Light 0 blinks 3×, Light 1 blinks 2×, Light 2 blinks 4×  → answer "324"
-        self.BLINK_PATTERN = [(0, 3), (1, 2), (2, 4)]
-        self.BLINK_ON = 0.4      # seconds light is ON
-        self.BLINK_OFF = 0.4     # seconds light is OFF
-        self.BLINK_PERIOD = self.BLINK_ON + self.BLINK_OFF  # 0.8s per blink
-        self.PAUSE_BETWEEN = 1.0  # pause between different lights
-        self.PAUSE_END = 2.0      # pause at end of full cycle
-        self.GLOW_COLORS = [
-            (255, 180, 50),   # amber / warm
-            (80, 255, 120),   # green
-            (100, 150, 255),  # blue
-        ]
+        # Spatial order: top→middle→bottom (indices 1, 2, 0)
+        # Top(1) blinks 3×, Middle(2) blinks 2×, Bottom(0) blinks 4×  → answer "324"
+        self.BLINK_PATTERN = [(1, 3), (2, 2), (0, 4)]
+        self.BLINK_ON = 0.55     # seconds light is ON (slower for easy counting)
+        self.BLINK_OFF = 0.50    # seconds light is OFF
+        self.BLINK_PERIOD = self.BLINK_ON + self.BLINK_OFF  # 1.05s per blink
+        self.PAUSE_BETWEEN = 1.2  # pause between different lights
+        self.PAUSE_END = 2.5      # pause at end of full cycle
+        self.GLOW_COLOR = (255, 255, 255)  # all white
         # Pre-compute total cycle duration
         self._blink_cycle_duration = 0.0
         for i, (_, count) in enumerate(self.BLINK_PATTERN):
@@ -55,6 +52,10 @@ class RoomState(State):
         self.scale = 1.0
         self.offset_x = 0
         self.offset_y = 0
+
+        # Feedback overlays
+        self.solve_flash_timer = 0.0
+        self.gate_open_timer = 0.0
 
         # Win state
         self.won = False
@@ -137,13 +138,14 @@ class RoomState(State):
         
         # Check specific level 2 unblock logic
         if self.ctx.get("current_level") == "level2":
-            if "misplaced_tile" in self.puzzles_solved:
-                # Remove gate
+            if "blinking_lights" in self.puzzles_solved:
+                # Remove gate once the first puzzle (blinking lights) is solved
                 gate = next((o for o in self.room.interactables if getattr(o, "label", "") == "Closed Gate"), None)
                 if gate:
                     self.room.interactables.remove(gate)
                     if gate.rect in self.room.walls:
                         self.room.walls.remove(gate.rect)
+                    self.gate_open_timer = 3.0  # show feedback
 
     def _auto_save(self):
         save_game(
@@ -203,6 +205,7 @@ class RoomState(State):
         for obj in self.room.interactables:
             if obj.puzzle_id == puzzle_id:
                 obj.solved = True
+        self.solve_flash_timer = 0.6   # green flash feedback
         self._check_door()
         self._auto_save()
 
@@ -233,6 +236,10 @@ class RoomState(State):
     def update(self, dt):
         if self.bump_msg_timer > 0:
             self.bump_msg_timer -= dt
+        if self.solve_flash_timer > 0:
+            self.solve_flash_timer -= dt
+        if self.gate_open_timer > 0:
+            self.gate_open_timer -= dt
 
         if self.ctx.get("current_level") == "level2" and "blinking_lights" not in self.puzzles_solved:
             self.blink_timer += dt
@@ -315,14 +322,14 @@ class RoomState(State):
             active_light, is_on = self._get_active_light()
             if active_light is not None and is_on and active_light < len(self.room.light_positions):
                 light_rect = self.room.light_positions[active_light]
-                color = self.GLOW_COLORS[active_light]
+                color = self.GLOW_COLOR
                 # Draw a glow circle on the SCALED surface at the scaled position
                 cx = int(light_rect.centerx * self.scale) + self.offset_x
                 cy = int(light_rect.centery * self.scale) + self.offset_y
-                radius = int(28 * self.scale)
+                radius = int(36 * self.scale)
                 glow_size = radius * 2 + 4
                 glow_surf = pygame.Surface((glow_size, glow_size), pygame.SRCALPHA)
-                pygame.draw.circle(glow_surf, (*color, 140), (glow_size // 2, glow_size // 2), radius)
+                pygame.draw.circle(glow_surf, (*color, 160), (glow_size // 2, glow_size // 2), radius)
                 surface.blit(glow_surf, (cx - glow_size // 2, cy - glow_size // 2))
 
         # --- HUD bar at bottom ---
@@ -335,6 +342,12 @@ class RoomState(State):
         name = self.font.render(
             f"  {self.ctx.get('player_name', 'Player')}", True, self.GOLD)
         surface.blit(name, (10, h - self.hud_height + 14))
+
+        # Level indicator
+        level = self.ctx.get("current_level", "level1")
+        level_label = "Level 1" if level == "level1" else "Level 2"
+        lvl_surf = self.small_font.render(level_label, True, self.ACCENT if hasattr(self, 'ACCENT') else (130, 180, 255))
+        surface.blit(lvl_surf, (10, h - self.hud_height + 2))
 
         # Puzzle progress
         total = sum(1 for o in self.room.interactables if o.puzzle_id)
@@ -382,25 +395,50 @@ class RoomState(State):
             surface.blit(msg_bg, (msg_x, msg_y))
             surface.blit(msg_surf, (msg_x + 10, msg_y + 5))
 
+        # Puzzle solve green flash
+        if self.solve_flash_timer > 0:
+            flash_alpha = int(80 * (self.solve_flash_timer / 0.6))
+            flash = pygame.Surface((w, h), pygame.SRCALPHA)
+            flash.fill((40, 200, 80, flash_alpha))
+            surface.blit(flash, (0, 0))
+
+        # Gate opened message
+        if self.gate_open_timer > 0:
+            msg = self.font.render("🔓 The gate creaks open...", True, self.GOLD)
+            msg_bg = pygame.Surface((msg.get_width() + 20, msg.get_height() + 10), pygame.SRCALPHA)
+            msg_bg.fill((0, 0, 0, 180))
+            mx = w // 2 - msg_bg.get_width() // 2
+            my = h // 3
+            surface.blit(msg_bg, (mx, my))
+            surface.blit(msg, (mx + 10, my + 5))
+
         # Win overlay
         if self.won:
             self._draw_win(surface, w, h)
 
     def _draw_win(self, surface, w, h):
+        # Fade-to-black: starts at 160 alpha, ramps to 255 over 5 seconds
+        fade = min(255, 160 + int((self.win_timer / 5.0) * 95))
         overlay = pygame.Surface((w, h), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 160))
+        overlay.fill((0, 0, 0, fade))
         surface.blit(overlay, (0, 0))
 
+        # Fade out text as we approach transition
+        text_alpha = max(0, 255 - int(max(0, self.win_timer - 3.5) / 1.5 * 255))
+
         win_text = self.big_font.render("🎉  YOU ESCAPED!  🎉", True, self.GOLD)
+        win_text.set_alpha(text_alpha)
         surface.blit(win_text, win_text.get_rect(center=(w // 2, h // 2 - 20)))
 
         level = self.ctx.get("current_level", "level1")
         sub_text = "Moving to Level 2..." if level == "level1" else "Congratulations! Game complete."
         sub = self.font.render(sub_text, True, self.WHITE)
+        sub.set_alpha(text_alpha)
         surface.blit(sub, sub.get_rect(center=(w // 2, h // 2 + 25)))
 
         hint_text = "Loading next area..." if level == "level1" else "Returning to menu..."
         hint = self.small_font.render(hint_text, True, (150, 150, 160))
+        hint.set_alpha(text_alpha)
         surface.blit(hint, hint.get_rect(center=(w // 2, h // 2 + 60)))
 
     # --- Lifecycle ----------------------------------------------------------

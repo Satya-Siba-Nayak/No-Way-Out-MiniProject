@@ -1,11 +1,15 @@
 {
-  "player_name": "Satya",
+  "player_name": "satya",
   "current_room": "level2",
-  "puzzles_solved": [],
-  "player_position": [
-    130,
-    476
+  "puzzles_solved": [
+    "blinking_lights",
+    "misplaced_tile",
+    "painting_code"
   ],
-  "sprite_id": "finn",
-  "timestamp": "2026-04-13T09:16:07.520251"
+  "player_position": [
+    219,
+    64
+  ],
+  "sprite_id": "maeve",
+  "timestamp": "2026-04-20T03:43:38.312679"
 }
