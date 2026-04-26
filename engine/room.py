@@ -19,6 +19,9 @@ EASY_TMX_PATH = os.path.join(
 LEVEL2_TMX_PATH = os.path.join(
     _BASE_DIR, "Maps", "Level 2 - new", "Tiled images", "HallwayLevel2.tmx"
 )
+LEVEL3_TMX_PATH = os.path.join(
+    _BASE_DIR, "Maps", "Level 3", "DungeonLevel3.tmx"
+)
 
 
 class Interactable:
@@ -391,6 +394,112 @@ def build_level2_room_from_tmx():
     start_rect = tiled_map.get_layer_bounding_rect("easyleveldoor")
     if start_rect:
         start_pos = (start_rect.centerx - 14, start_rect.centery - 20)
+
+    return room, start_pos
+
+def _add_tile_walls(room, tiled_map, layer_name):
+    """Add per-tile collision rects for every non-zero tile in a layer."""
+    positions = tiled_map.get_layer_tile_positions(layer_name)
+    for col, row in positions:
+        room.walls.append(pygame.Rect(col * TILE, row * TILE, TILE, TILE))
+
+
+def build_level3_room_from_tmx():
+    """Build the Level 3 escape room from DungeonLevel3.tmx."""
+    if not os.path.exists(LEVEL3_TMX_PATH):
+        print("[Room] Level 3 TMX file not found.")
+        return Room(25, 15), (100, 100)
+
+    print("[Room] Loading Level 3 TMX map...")
+    tiled_map = load_tmx(LEVEL3_TMX_PATH)
+    room = Room(tiled_map.width, tiled_map.height)
+    room.tmx_surface = tiled_map.render()
+
+    # ── Border walls (per-tile) ──────────────────────────────────────────
+    border_positions = tiled_map.get_layer_tile_positions("border")
+    if border_positions:
+        for col, row in border_positions:
+            room.walls.append(pygame.Rect(col * TILE, row * TILE, TILE, TILE))
+    else:
+        room.build_walls_border()
+
+    # ── Wall layer — per-tile, NOT bounding rect ─────────────────────────
+    _add_tile_walls(room, tiled_map, "wall")
+
+    # ── Interactable objects ─────────────────────────────────────────────
+    # For each interactable we use the bounding rect for the *interaction*
+    # detection, but add only per-tile walls so the player can walk around.
+
+    # Furnace
+    furnace_rect = tiled_map.get_layer_bounding_rect("furnace")
+    if furnace_rect:
+        furnace = Interactable(
+            rect=furnace_rect, label="Furnace",
+            puzzle_id="furnace_sequence", color=(100, 50, 50)
+        )
+        room.interactables.append(furnace)
+        _add_tile_walls(room, tiled_map, "furnace")
+
+    # Supply Table (Chemistry)
+    table_rect = tiled_map.get_layer_bounding_rect("supplytable")
+    if table_rect:
+        table = Interactable(
+            rect=table_rect, label="Chemistry Table",
+            puzzle_id="chemistry_drops", color=(80, 80, 80)
+        )
+        room.interactables.append(table)
+        _add_tile_walls(room, tiled_map, "supplytable")
+
+    # Mirror
+    mirror_rect = tiled_map.get_layer_bounding_rect("mirror")
+    if mirror_rect:
+        mirror = Interactable(
+            rect=mirror_rect, label="Mirror",
+            puzzle_id="mirror_coords", color=(150, 150, 200)
+        )
+        room.interactables.append(mirror)
+        _add_tile_walls(room, tiled_map, "mirror")
+
+    # Statues
+    statues_rect = tiled_map.get_layer_bounding_rect("statues")
+    if statues_rect:
+        statues = Interactable(
+            rect=statues_rect, label="Mage Statue",
+            puzzle_id="statue_riddle", color=(100, 100, 100)
+        )
+        room.interactables.append(statues)
+        _add_tile_walls(room, tiled_map, "statues")
+
+    # Drums / Boxes
+    drums_rect = tiled_map.get_layer_bounding_rect("drums3")
+    if drums_rect:
+        drums = Interactable(
+            rect=drums_rect, label="Wooden Boxes",
+            puzzle_id="box_math", color=(139, 90, 43)
+        )
+        room.interactables.append(drums)
+        _add_tile_walls(room, tiled_map, "drums3")
+
+    # Exit Door
+    door_rect = tiled_map.get_layer_bounding_rect("door")
+    if door_rect:
+        door = Interactable(
+            rect=door_rect, label="Heavy Door 🔒",
+            puzzle_id=None, color=(60, 40, 40)
+        )
+        room.interactables.append(door)
+        # Don't wall the door — player needs to walk to it
+
+    # ── Decoration layers — add per-tile walls so player can't overlap ───
+    deco_wall_layers = [
+        "burner", "skeletonface", "floor fire", "lamp",
+        "bagsdirt", "drum", "ladder", "drums2", "chest",
+    ]
+    for layer_name in deco_wall_layers:
+        _add_tile_walls(room, tiled_map, layer_name)
+
+    # Player start position (center-bottom of room, open floor area)
+    start_pos = (400, 350)
 
     return room, start_pos
 

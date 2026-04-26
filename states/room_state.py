@@ -9,7 +9,7 @@ import sys
 import pygame
 from states.base_state import State
 from engine.player import Player
-from engine.room import build_easy_room_from_tmx, build_level2_room_from_tmx, TILE
+from engine.room import build_easy_room_from_tmx, build_level2_room_from_tmx, build_level3_room_from_tmx, TILE
 from engine.save_system import save_game
 
 
@@ -82,7 +82,9 @@ class RoomState(State):
 
         # Build the room from the TMX map
         level = self.ctx.get("current_level", "level1")
-        if level == "level2":
+        if level == "level3":
+            result = build_level3_room_from_tmx()
+        elif level == "level2":
             result = build_level2_room_from_tmx()
         else:
             result = build_easy_room_from_tmx()
@@ -118,11 +120,11 @@ class RoomState(State):
         else:
             self.player = Player(start_pos[0], start_pos[1], sprite_id=sprite_id)
 
-        # Scale down player in Level 2
-        if self.ctx.get("current_level") == "level2":
+        # Scale down player in Level 2 and Level 3
+        if self.ctx.get("current_level") in ["level2", "level3"]:
             self.player.render_scale = 0.70
-            self.player.rect.width = 35
-            self.player.rect.height = 35
+            self.player.rect.width = 15  # Very small physical footprint
+            self.player.rect.height = 15 # to slide through tight furniture gaps
 
         # Save immediately upon entering a new level cleanly
         self._auto_save()
@@ -255,8 +257,15 @@ class RoomState(State):
                     self.ctx["load_save"] = False
                     from states.room_state import RoomState
                     self.machine.change(RoomState(self.machine, self.ctx))
+                elif level == "level2":
+                    # Transition to Level 3
+                    self.ctx["current_level"] = "level3"
+                    self.ctx["puzzles_solved"] = []
+                    self.ctx["load_save"] = False
+                    from states.room_state import RoomState
+                    self.machine.change(RoomState(self.machine, self.ctx))
                 else:
-                    # Back to menu after beating game
+                    # Back to menu after beating game (Level 3)
                     from states.menu_state import MenuState
                     self.machine.change(MenuState(self.machine, self.ctx))
             return
@@ -345,7 +354,12 @@ class RoomState(State):
 
         # Level indicator
         level = self.ctx.get("current_level", "level1")
-        level_label = "Level 1" if level == "level1" else "Level 2"
+        if level == "level1":
+            level_label = "Level 1"
+        elif level == "level2":
+            level_label = "Level 2"
+        else:
+            level_label = "Level 3"
         lvl_surf = self.small_font.render(level_label, True, self.ACCENT if hasattr(self, 'ACCENT') else (130, 180, 255))
         surface.blit(lvl_surf, (10, h - self.hud_height + 2))
 
@@ -431,12 +445,20 @@ class RoomState(State):
         surface.blit(win_text, win_text.get_rect(center=(w // 2, h // 2 - 20)))
 
         level = self.ctx.get("current_level", "level1")
-        sub_text = "Moving to Level 2..." if level == "level1" else "Congratulations! Game complete."
+        if level == "level1":
+            sub_text = "Moving to Level 2..."
+        elif level == "level2":
+            sub_text = "Moving to Level 3..."
+        else:
+            sub_text = "Congratulations! Game complete."
         sub = self.font.render(sub_text, True, self.WHITE)
         sub.set_alpha(text_alpha)
         surface.blit(sub, sub.get_rect(center=(w // 2, h // 2 + 25)))
 
-        hint_text = "Loading next area..." if level == "level1" else "Returning to menu..."
+        if level in ["level1", "level2"]:
+            hint_text = "Loading next area..."
+        else:
+            hint_text = "Returning to menu..."
         hint = self.small_font.render(hint_text, True, (150, 150, 160))
         hint.set_alpha(text_alpha)
         surface.blit(hint, hint.get_rect(center=(w // 2, h // 2 + 60)))

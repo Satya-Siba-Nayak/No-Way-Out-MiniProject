@@ -86,6 +86,7 @@ class CouchSlicingPuzzle:
 
 # Registry — maps puzzle_id to its class
 from puzzles.level2_puzzles import BlinkingLightsPuzzle, MisplacedTilePuzzle, PaintingPuzzle
+from puzzles.level3_puzzles import LEVEL3_PUZZLES
 
 PUZZLE_REGISTRY = {
     "caesar_cipher": CaesarCipherPuzzle,
@@ -98,6 +99,7 @@ PUZZLE_REGISTRY = {
     "misplaced_tile": MisplacedTilePuzzle,
     "painting_code": PaintingPuzzle,
 }
+PUZZLE_REGISTRY.update(LEVEL3_PUZZLES)
 
 """
 Medium Puzzles:
