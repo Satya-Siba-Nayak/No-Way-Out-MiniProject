@@ -265,9 +265,9 @@ class RoomState(State):
                     from states.room_state import RoomState
                     self.machine.change(RoomState(self.machine, self.ctx))
                 else:
-                    # Back to menu after beating game (Level 3)
-                    from states.menu_state import MenuState
-                    self.machine.change(MenuState(self.machine, self.ctx))
+                    # Victory Screen after beating game (Level 3)
+                    from states.victory_state import VictoryState
+                    self.machine.change(VictoryState(self.machine, self.ctx))
             return
 
         # Move player
