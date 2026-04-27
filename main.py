@@ -1,12 +1,5 @@
 """
 NO WAY OUT? — Main Entry Point
-===============================
-A Stardew-Valley-style escape room game built with Pygame.
-
-Team:
-  Satya  — Architecture, State Machine, Integration, Save System
-  Keya   — Puzzle Logic, Map Design (.tmx), Testing
-  Sneha  — Art Assets, Inventory Coding, Dialogue System
 
 This file initializes Pygame and starts the State Machine.
 All game logic lives in the states/ and engine/ packages.
